@@ -1,0 +1,93 @@
+# .gitignore for .NET projects
+# Build results
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+
+# NuGet
+*.nupkg
+# NuGet Packages
+# The packages folder can be ignored if it exists in your project
+packages/
+# Uncomment if you have NuGet Package Restore enabled
+#*.nuget
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Azure WebJobs
+*.azurewebjobs
+
+# Entity Framework
+*.edmx.sql
+*.edmx.diagram
+*.edmx
+
+# Others
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# DotCover
+*.dotCover
+
+# TeamCity
+_TeamCity*
+
+# Windows image file caches
+Thumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Windows Installer files
+*.msi
+*.cab
+
+# Windows shortcuts
+*.lnk
+
+# JetBrains IDEs
+.idea/
+*.sln.iml
+
+# Local history
+.localhistory/
+
+# Test results
+TestResults/
+
+# Build logs
+*.log
+
+# Publish
+*.publish.xml
+
+# Others
+*.dbmdl
+*.bak
+*.backup
+*.swp
+*.tmp
+*.temp
+
+# Ignore appsettings secrets
+appsettings.Development.json
+appsettings.Local.json
