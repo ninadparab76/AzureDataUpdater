@@ -7,7 +7,7 @@ class Program
     static async Task Main(string[] args)
     {
         // ==========================================
-        // 1. LOAD CONFIGURATION
+        // 1. LOAD CONFIGURATION FROM JSON
         // ==========================================
         var config = new ConfigurationBuilder()
             .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
@@ -18,26 +18,26 @@ class Program
         string destConnStr = config.GetConnectionString("DestinationDatabase");
 
         var settings = config.GetSection("DataTransferSettings");
-        string sourceTableName = settings["SourceTableName"];
+        
+        string sourceQuery = settings["SourceQuery"];
+        string sourceCountQuery = settings["SourceCountQuery"];
         string destTableName = settings["DestinationTableName"];
         string stagingTableName = settings["StagingTableName"];
 
-        var lookupMapping = config.GetSection("DataTransferSettings:LookupColumns").GetChildren().ToDictionary(x => x.Key, x => x.Value);
-        var updateMapping = config.GetSection("DataTransferSettings:UpdateColumns").GetChildren().ToDictionary(x => x.Key, x => x.Value);
+        List<string> destLookupColumns = config.GetSection("DataTransferSettings:LookupColumns")
+                                               .GetChildren()
+                                               .Select(c => c.Value)
+                                               .ToList();
+                                               
+        List<string> destUpdateColumns = config.GetSection("DataTransferSettings:UpdateColumns")
+                                               .GetChildren()
+                                               .Select(c => c.Value)
+                                               .ToList();
+
+        List<string> allDestColumns = destLookupColumns.Concat(destUpdateColumns).ToList();
 
         // ==========================================
-        // 2. DYNAMIC SQL GENERATION
-        // ==========================================
-        var allMappings = lookupMapping.Concat(updateMapping).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-        var selectClauses = allMappings.Select(m => $"[{m.Key}] AS [{m.Value}]");
-        string sourceQuery = $"SELECT {string.Join(", ", selectClauses)} FROM {sourceTableName}";
-
-        List<string> destLookupColumns = lookupMapping.Values.ToList();
-        List<string> destUpdateColumns = updateMapping.Values.ToList();
-        List<string> allDestColumns = allMappings.Values.ToList();
-
-        // ==========================================
-        // 3. EXECUTE PIPELINE
+        // 2. EXECUTE PIPELINE
         // ==========================================
         bool triggersDisabled = false;
 
@@ -50,7 +50,7 @@ class Program
             using (var spinner = new ConsoleSpinner("Calculating total rows to process... "))
             {
                 using (SqlConnection sourceConn = new SqlConnection(sourceConnStr))
-                using (SqlCommand countCmd = new SqlCommand($"SELECT COUNT(*) FROM {sourceTableName}", sourceConn))
+                using (SqlCommand countCmd = new SqlCommand(sourceCountQuery, sourceConn))
                 {
                     await sourceConn.OpenAsync();
                     totalRowsToProcess = Convert.ToInt64(await countCmd.ExecuteScalarAsync());
@@ -192,7 +192,6 @@ class Program
                     }
                 }
                 
-                // Force UI to 100% and break to next line cleanly
                 LogProgress("Transfer", totalRows, totalRows, stopwatch.Elapsed);
                 Console.WriteLine();
                 
@@ -266,7 +265,6 @@ class Program
             }
         }
         
-        // Force UI to 100% and break to next line cleanly
         LogProgress("Updating", totalRows, totalRows, stopwatch.Elapsed);
         Console.WriteLine();
         stopwatch.Stop();
@@ -282,7 +280,7 @@ class Program
     // ==========================================
     static void LogProgress(string phase, long currentRows, long totalRows, TimeSpan elapsed)
     {
-        if (currentRows > totalRows) currentRows = totalRows; // Clamp to 100% if source grew during copy
+        if (currentRows > totalRows) currentRows = totalRows; 
 
         double elapsedSeconds = elapsed.TotalSeconds == 0 ? 0.001 : elapsed.TotalSeconds; 
         double speed = currentRows / elapsedSeconds;
@@ -290,11 +288,14 @@ class Program
         TimeSpan eta = TimeSpan.FromSeconds(speed > 0 ? remainingRows / speed : 0);
         
         double percentComplete = (double)currentRows / totalRows * 100;
-        int barSize = 15; // Shorter bar to prevent console line-wrapping
+        
+        // Reduced bar size to 10 to comfortably fit the speed metric on standard screens
+        int barSize = 10; 
         int filled = (int)(percentComplete / 100 * barSize);
         string bar = new string('█', filled) + new string('░', barSize - filled);
 
-        Console.Write($"\r{phase,-8} [{bar}] {percentComplete,5:F1}% | {currentRows,9:N0}/{totalRows,9:N0} | ETA: {eta:hh\\:mm\\:ss}   ");
+        // Added the speed metric {speed,7:N0} r/s back into the string!
+        Console.Write($"\r{phase,-8} [{bar}] {percentComplete,5:F1}% | {currentRows,9:N0}/{totalRows,9:N0} | {speed,7:N0} r/s | ETA: {eta:hh\\:mm\\:ss}   ");
     }
 
     static bool IsTransientError(SqlException ex)
